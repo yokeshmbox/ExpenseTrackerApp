@@ -1,0 +1,224 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the ZenithSpend application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "User's phone number for authentication.",
+          "format": "string"
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "User's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "User's last name."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "Transaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Transaction",
+      "type": "object",
+      "description": "Represents a financial transaction made by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Transaction entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Transaction)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount of the transaction."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the transaction."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to Category. (Relationship: Category 1:N Transaction)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date of the transaction.",
+          "format": "date-time"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of transaction (income or expense)."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "amount",
+        "description",
+        "categoryId",
+        "date",
+        "type"
+      ]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Represents a category for classifying transactions.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Category entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the category (e.g., Housing, Food, Transport)."
+        },
+        "icon": {
+          "type": "string",
+          "description": "The icon associated with the category."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "icon"
+      ]
+    },
+    "Budget": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Budget",
+      "type": "object",
+      "description": "Represents a user's budget for a specific category.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Budget entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Budget)"
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to Category. (Relationship: Category 1:N Budget)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "The monthly spending limit for the category."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "categoryId",
+        "limit"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information. The 'userId' parameter matches the Firebase Auth UID for path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}/transactions/{transactionId}",
+        "definition": {
+          "entityName": "Transaction",
+          "schema": {
+            "$ref": "#/backend/entities/Transaction"
+          },
+          "description": "Stores transaction data for a specific user.  Path-based ownership is enforced via the 'userId' parameter.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user."
+            },
+            {
+              "name": "transactionId",
+              "description": "Unique identifier for the transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Stores category data for a specific user. Path-based ownership is enforced via the 'userId' parameter.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user."
+            },
+            {
+              "name": "categoryId",
+              "description": "Unique identifier for the category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}/budgets/{budgetID}",
+        "definition": {
+          "entityName": "Budget",
+          "schema": {
+            "$ref": "#/backend/entities/Budget"
+          },
+          "description": "Stores budget data for a specific user. Path-based ownership is enforced via the 'userId' parameter.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user."
+            },
+            {
+              "name": "budgetID",
+              "description": "Unique identifier for the budget."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to be secure, scalable, and easily debuggable, following the principles of Authorization Independence, Clarity of Intent, and DBAC. User data and their associated transactions, budgets, and categories are organized under user-specific paths to ensure data isolation and simplified security rules.\n\nThe `users/{userId}` collection stores user profiles, with `userId` matching the Firebase Auth UID. This path-based ownership ensures that only the authenticated user can access their own profile data. Transactions, budgets, and categories are stored as subcollections under each user's document (`users/{userId}/transactions/{transactionId}`, `users/{userId}/budgets/{budgetId}`, and `users/{userId}/categories/{categoryId}`). This hierarchical structure facilitates easy querying and enforces ownership.\n\nAuthorization Independence is achieved because access control is based solely on the authenticated user's UID and the path structure, avoiding the need for `get()` calls in security rules. The structure directly reflects the data ownership, making the rules straightforward and efficient.\n\nThe structure supports QAPs by segregating data based on ownership. Since each user's data is stored under their respective `userId`, listing transactions or budgets is inherently secure, as the rules only need to check if the requesting user's UID matches the `userId` in the path. The use of hierarchical paths for user-owned data is a simple approach and is highly secure. All information is kept separate, preventing accidental or malicious access between user documents."
+  }
+}

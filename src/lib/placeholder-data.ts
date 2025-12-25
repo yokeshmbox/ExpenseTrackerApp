@@ -1,0 +1,41 @@
+
+import type { Transaction, CategoryName, RecurringPayment } from '@/types';
+import {
+  Home,
+  UtensilsCrossed,
+  Car,
+  Film,
+  HeartPulse,
+  ShoppingBag,
+  Lightbulb,
+  Landmark,
+  IndianRupee,
+  University,
+  User,
+  TrendingUp,
+  ShieldCheck,
+  Router,
+  CreditCard,
+  Undo2,
+  MoreHorizontal,
+} from 'lucide-react';
+
+export const categoryIcons: Record<CategoryName, React.ElementType> = {
+  Salary: IndianRupee,
+  Refunds: Undo2,
+  'Other Income': MoreHorizontal,
+  Housing: Home,
+  Food: UtensilsCrossed,
+  Transport: Car,
+  Entertainment: Film,
+  Health: HeartPulse,
+  Shopping: ShoppingBag,
+  Utilities: Lightbulb,
+  Loan: University,
+  Personal: User,
+  Investment: TrendingUp,
+  Insurance: ShieldCheck,
+  Broadband: Router,
+  'Credit Card': CreditCard,
+  Other: Landmark,
+};

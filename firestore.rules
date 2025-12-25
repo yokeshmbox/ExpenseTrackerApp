@@ -1,0 +1,85 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * Core Philosophy: This ruleset enforces a strict user-ownership model where all user-related data is private,
+     * EXCEPT for a single, designated 'shared-anonymous-user' account which is public to all signed-in users.
+     * This allows for a "party mode" or guest experience where all anonymous users share the same data.
+     */
+
+    // --------------------------------------------------------------------------------
+    // Helper Functions
+    // --------------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the provided userId.
+     * This is the primary function for enforcing private data ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    /**
+     * The hardcoded ID for the shared anonymous user.
+     */
+    function sharedUserId() {
+      return 'shared-anonymous-user';
+    }
+
+    // --------------------------------------------------------------------------------
+    // Collection Rules
+    // --------------------------------------------------------------------------------
+
+    /**
+     * @description Manages user profile documents.
+     *   - Private users can only access their own documents.
+     *   - The shared user document is accessible by any signed-in user.
+     * @path /users/{userId}
+     */
+    match /users/{userId} {
+      // Private user access
+      allow get, update, delete: if isOwner(userId) && userId != sharedUserId();
+      allow create: if isOwner(userId) && request.resource.data.id == userId && userId != sharedUserId();
+
+      // Shared anonymous user access
+      allow get, list, create, update, delete: if isSignedIn() && userId == sharedUserId();
+
+      /**
+       * @description Manages transactions. Access is based on the parent user document.
+       */
+      match /transactions/{transactionId} {
+        allow get, list, create, update, delete: if (isOwner(userId) && userId != sharedUserId()) || (isSignedIn() && userId == sharedUserId());
+      }
+
+      /**
+       * @description Manages categories. Access is based on the parent user document.
+       */
+      match /categories/{categoryId} {
+        allow get, list, create, update, delete: if (isOwner(userId) && userId != sharedUserId()) || (isSignedIn() && userId == sharedUserId());
+      }
+
+      /**
+       * @description Manages budgets. Access is based on the parent user document.
+       */
+      match /budgets/{budgetID} {
+        allow get, list, create, update, delete: if (isOwner(userId) && userId != sharedUserId()) || (isSignedIn() && userId == sharedUserId());
+      }
+      
+      /**
+       * @description Manages recurring payments. Access is based on the parent user document.
+       */
+      match /recurringPayments/{paymentId} {
+        allow get, list, create, update, delete: if (isOwner(userId) && userId != sharedUserId()) || (isSignedIn() && userId == sharedUserId());
+      }
+    }
+  }
+}
