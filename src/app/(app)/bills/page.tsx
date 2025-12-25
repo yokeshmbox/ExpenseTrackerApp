@@ -322,8 +322,10 @@ export default function BillsPage() {
   const [orderedBills, setOrderedBills] = useState<RecurringPayment[]>([]);
 
   const billsQuery = useMemoFirebase(
-    () => (sharedUserId ? query(collection(firestore, 'users', sharedUserId, 'recurringPayments')) : null),
+    () => (sharedUserId && firestore ? query(collection(firestore, 'users', sharedUserId, 'recurringPayments')) : null),
     [firestore, sharedUserId]
+
+    
   );
 
   const { data: bills, isLoading } = useCollection<RecurringPayment>(billsQuery);
