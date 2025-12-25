@@ -293,7 +293,7 @@ export function generatePdfStatement({
     const footerY = doc.internal.pageSize.height - 10;
     doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, footerY, { align: 'center' });
     doc.text('This is a computer-generated statement.', margin, footerY);
-    doc.text('Personal Finance', pageWidth - margin, footerY, { align: 'right' });
+    doc.text('Log Expense', pageWidth - margin, footerY, { align: 'right' });
   }
 
   doc.save(fileName);
