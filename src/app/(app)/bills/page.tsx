@@ -104,6 +104,8 @@ import {
 import { categoryIcons } from '@/lib/placeholder-data';
 import { Badge } from '@/components/ui/badge';
 import type { CategoryName } from '@/types';
+import { useFormulaInput } from '@/hooks/use-formula-input';
+import { Calculator } from 'lucide-react';
 
 const billFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -127,6 +129,13 @@ function BillFormDialog({
     resolver: zodResolver(billFormSchema),
   });
 
+  const amountFormula = useFormulaInput({
+    onCalculate: (value) => {
+      form.setValue('amount', value);
+    },
+    initialValue: bill?.amount || '',
+  });
+
   useEffect(() => {
     if (bill) {
       form.reset({
@@ -134,8 +143,10 @@ function BillFormDialog({
         category: bill.category || '',
         amount: bill.amount || 0,
       });
+      amountFormula.reset(bill.amount || '');
     } else {
       form.reset({ name: '', category: '', amount: 0 });
+      amountFormula.reset('');
     }
   }, [bill, form]);
 
@@ -202,7 +213,29 @@ function BillFormDialog({
             <FormField control={form.control} name="amount" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Expected Amount</FormLabel>
-                  <FormControl><Input type="number" placeholder="Enter expected amount" {...field} /></FormControl>
+                  <FormControl>
+                    <div className="relative">
+                      <Input 
+                        placeholder="Enter amount or formula (e.g., =20+30)" 
+                        value={amountFormula.displayValue}
+                        onChange={(e) => amountFormula.handleChange(e.target.value)}
+                        onBlur={amountFormula.handleBlur}
+                        className={cn(
+                          amountFormula.isCalculating && "pl-9 border-primary/50 bg-primary/5",
+                          amountFormula.error && "border-destructive"
+                        )}
+                      />
+                      {amountFormula.isCalculating && (
+                        <Calculator className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                  </FormControl>
+                  {amountFormula.error && (
+                    <p className="text-sm text-destructive">{amountFormula.error}</p>
+                  )}
+                  {!amountFormula.error && amountFormula.isCalculating && (
+                    <p className="text-xs text-muted-foreground">Press Enter or click outside to calculate</p>
+                  )}
                   <FormMessage />
                 </FormItem>
             )}/>
@@ -236,9 +269,17 @@ function PayBillDialog({
     resolver: zodResolver(paymentFormSchema),
   });
 
+  const paymentFormula = useFormulaInput({
+    onCalculate: (value) => {
+      form.setValue('amount', value);
+    },
+    initialValue: bill?.amount || '',
+  });
+
   useEffect(() => {
     if (bill) {
       form.reset({ amount: bill.amount });
+      paymentFormula.reset(bill.amount);
     }
   }, [bill, form]);
 
@@ -267,8 +308,28 @@ function PayBillDialog({
                 <FormItem>
                   <FormLabel>Payment Amount</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Enter amount" {...field} value={field.value || ''} />
+                    <div className="relative">
+                      <Input 
+                        placeholder="Enter amount or formula (e.g., =100-10)" 
+                        value={paymentFormula.displayValue}
+                        onChange={(e) => paymentFormula.handleChange(e.target.value)}
+                        onBlur={paymentFormula.handleBlur}
+                        className={cn(
+                          paymentFormula.isCalculating && "pl-9 border-primary/50 bg-primary/5",
+                          paymentFormula.error && "border-destructive"
+                        )}
+                      />
+                      {paymentFormula.isCalculating && (
+                        <Calculator className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                      )}
+                    </div>
                   </FormControl>
+                  {paymentFormula.error && (
+                    <p className="text-sm text-destructive">{paymentFormula.error}</p>
+                  )}
+                  {!paymentFormula.error && paymentFormula.isCalculating && (
+                    <p className="text-xs text-muted-foreground">Press Enter or click outside to calculate</p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

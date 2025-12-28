@@ -38,6 +38,9 @@ import { collection, doc } from 'firebase/firestore';
 import { useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useFormulaInput } from '@/hooks/use-formula-input';
+import { Calculator } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
   type: z.enum(['income', 'expense'], {
@@ -67,6 +70,13 @@ export function AddTransactionDialog({ transaction, open, onOpenChange }: AddTra
     resolver: zodResolver(formSchema),
   });
 
+  const amountFormula = useFormulaInput({
+    onCalculate: (value) => {
+      form.setValue('amount', value);
+    },
+    initialValue: transaction?.amount || '',
+  });
+
   const transactionType = form.watch('type');
   const isEditing = !!transaction?.id;
 
@@ -80,6 +90,7 @@ export function AddTransactionDialog({ transaction, open, onOpenChange }: AddTra
           category: transaction.category || '',
           date: transaction.date ? format(new Date(transaction.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
         });
+        amountFormula.reset(transaction.amount || '');
       } else {
           form.reset({
               type: 'expense',
@@ -88,6 +99,7 @@ export function AddTransactionDialog({ transaction, open, onOpenChange }: AddTra
               category: undefined,
               date: format(new Date(), 'yyyy-MM-dd'),
           });
+          amountFormula.reset('');
       }
     }
   }, [transaction, open, form]);
@@ -198,8 +210,25 @@ export function AddTransactionDialog({ transaction, open, onOpenChange }: AddTra
                     <FormItem>
                     <FormLabel>Amount</FormLabel>
                     <FormControl>
-                        <Input type="number" placeholder="₹100.00" {...field} value={field.value || ''} />
+                        <div className="relative">
+                          <Input 
+                            placeholder="₹100 or =50*2" 
+                            value={amountFormula.displayValue}
+                            onChange={(e) => amountFormula.handleChange(e.target.value)}
+                            onBlur={amountFormula.handleBlur}
+                            className={cn(
+                              amountFormula.isCalculating && "pl-9 border-primary/50 bg-primary/5",
+                              amountFormula.error && "border-destructive"
+                            )}
+                          />
+                          {amountFormula.isCalculating && (
+                            <Calculator className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                          )}
+                        </div>
                     </FormControl>
+                    {amountFormula.error && (
+                      <p className="text-xs text-destructive">{amountFormula.error}</p>
+                    )}
                     <FormMessage />
                     </FormItem>
                 )}
