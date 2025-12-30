@@ -294,7 +294,7 @@ function PayBillDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Pay Bill: {bill.name}</DialogTitle>
+          <DialogTitle>Make Payment: {bill.name}</DialogTitle>
           <DialogDescription>
             Confirm the amount for this month's payment. The expected amount is pre-filled.
           </DialogDescription>
@@ -550,20 +550,45 @@ export default function BillsPage() {
 
   return (
     <div className="grid gap-4 md:gap-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl flex items-center gap-2">
             <FileText className="h-7 w-7" />
-            Monthly Bills
+            Monthly Mandates
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Track and manage your recurring monthly payments.
           </p>
         </div>
-        <Button onClick={() => setEditingBill({})} className="w-full sm:w-auto">
-          <PlusCircle className="mr-2" />
-          Add Bill
-        </Button>
+        
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {/* Progress Card - Compact on Desktop */}
+              <Card className="bg-gradient-to-r from-emerald-500/5 to-green-500/5 border-emerald-500/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500/20 flex-shrink-0">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs text-muted-foreground">Monthly Progress</span>
+                  <span className="text-sm font-bold text-foreground">
+                  {orderedBills.filter(isBillPaidThisMonth).length} / {orderedBills.length} Paid
+                  </span>
+                </div>
+                <div className="text-right ml-auto">
+                  <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                  {Math.round((orderedBills.filter(isBillPaidThisMonth).length / Math.max(orderedBills.length, 1)) * 100)}%
+                  </div>
+                </div>
+                </div>
+              </CardContent>
+              </Card>
+              
+              <Button onClick={() => setEditingBill({})} className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Bill
+              </Button>
+            </div>
       </div>
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">

@@ -22,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -41,6 +40,10 @@ import { format } from 'date-fns';
 import { useFormulaInput } from '@/hooks/use-formula-input';
 import { Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "../ui/toggle-group"
 
 const formSchema = z.object({
   type: z.enum(['income', 'expense'], {
@@ -152,145 +155,153 @@ export function AddTransactionDialog({ transaction, open, onOpenChange }: AddTra
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>Transaction Type</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        form.setValue('category', ''); // Reset category on type change
-                      }}
-                      defaultValue={field.value}
-                      className="flex space-x-4"
-                      disabled={isEditing}
-                    >
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="income" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Income</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="expense" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Expense</FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Coffee, Salary" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-               <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                        <div className="relative">
-                          <Input 
-                            placeholder="₹100 or =50*2" 
-                            value={amountFormula.displayValue}
-                            onChange={(e) => amountFormula.handleChange(e.target.value)}
-                            onBlur={amountFormula.handleBlur}
-                            className={cn(
-                              amountFormula.isCalculating && "pl-9 border-primary/50 bg-primary/5",
-                              amountFormula.error && "border-destructive"
-                            )}
-                          />
-                          {amountFormula.isCalculating && (
-                            <Calculator className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
-                          )}
-                        </div>
-                    </FormControl>
-                    {amountFormula.error && (
-                      <p className="text-xs text-destructive">{amountFormula.error}</p>
-                    )}
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
-                  name="date"
+                  name="type"
+                  render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel className="text-base font-semibold">Transaction Type</FormLabel>
+                    <FormControl>
+                    <ToggleGroup 
+                      type='single'
+                      onValueChange={(value) => {
+                      field.onChange(value);
+                      form.setValue('category', '');
+                      }}
+                      value={field.value}
+                      className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg"
+                      disabled={isEditing}
+                    >
+                      <ToggleGroupItem 
+                      value="income" 
+                      className="data-[state=on]:bg-green-500 data-[state=on]:text-white rounded-md py-2"
+                      >
+                      <span className="font-medium">Income</span>
+                      </ToggleGroupItem>
+                      <ToggleGroupItem 
+                      value="expense"
+                      className="data-[state=on]:bg-red-500 data-[state=on]:text-white rounded-md py-2"
+                      >
+                      <span className="font-medium">Expense</span>
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <FormField
+                  control={form.control}
+                  name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Date</FormLabel>
+                      <FormLabel className="text-sm font-medium">Amount</FormLabel>
                       <FormControl>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
                         <Input 
-                          type="date" 
-                          {...field} 
-                          className="block w-full cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 hover:[&::-webkit-calendar-picker-indicator]:opacity-100"
+                        placeholder="100 or =50*2" 
+                        value={amountFormula.displayValue}
+                        onChange={(e) => amountFormula.handleChange(e.target.value)}
+                        onBlur={amountFormula.handleBlur}
+                        className={cn(
+                          "h-10 pl-7",
+                          amountFormula.isCalculating && "pr-9 border-primary/50 bg-primary/5",
+                          amountFormula.error && "border-destructive"
+                        )}
                         />
+                        {amountFormula.isCalculating && (
+                        <Calculator className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary animate-pulse" />
+                        )}
+                      </div>
                       </FormControl>
+                      {amountFormula.error && (
+                      <p className="text-xs text-destructive mt-1">{amountFormula.error}</p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
-                />
-            </div>
+                  />
+                  <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Date</FormLabel>
+                      <FormControl>
+                      <Input 
+                        type="date" 
+                        {...field} 
+                        className="h-10 block w-full cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 hover:[&::-webkit-calendar-picker-indicator]:opacity-100"
+                      />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                    )}
+                  />
+                </div>
 
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Category</FormLabel>
+                    <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
                     value={field.value}
-                  >
+                    >
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
+                      <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {categories.map((category) => {
-                        const CategoryIcon = categoryIcons[category];
-                        return (
-                            <SelectItem key={category} value={category}>
-                                <div className='flex items-center gap-2'>
-                                    {CategoryIcon && <CategoryIcon className="h-4 w-4" />}
-                                    <span>{category}</span>
-                                </div>
-                            </SelectItem>
-                        );
+                      const CategoryIcon = categoryIcons[category];
+                      return (
+                        <SelectItem key={category} value={category} className="cursor-pointer">
+                          <div className='flex items-center gap-2'>
+                            {CategoryIcon && <CategoryIcon className="h-4 w-4 text-muted-foreground" />}
+                            <span>{category}</span>
+                          </div>
+                        </SelectItem>
+                      );
                       })}
                     </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                  )}
+                />
 
-            <DialogFooter>
-              <Button type="submit">{isEditing ? 'Save Changes' : 'Add Transaction'}</Button>
-            </DialogFooter>
-          </form>
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Description</FormLabel>
+                    <FormControl>
+                    <Input 
+                      placeholder="e.g. Coffee, Salary" 
+                      {...field}
+                      className="h-10"
+                    />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                  )}
+                />
+
+                <DialogFooter className="pt-4">
+                  <Button type="submit" className="w-full sm:w-auto min-w-[120px]">
+                  {isEditing ? 'Save Changes' : 'Add Transaction'}
+                  </Button>
+                </DialogFooter>
+                </form>
         </Form>
       </DialogContent>
     </Dialog>

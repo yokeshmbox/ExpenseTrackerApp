@@ -18,7 +18,7 @@ export async function handleAnonymousSignIn(auth: Auth) {
     const user = userCredential.user;
 
     if (user) {
-      const { firestore } = getSdks(user.app);
+      const { firestore } = getSdks(auth.app);
       
       // Ensure the SHARED user document exists.
       const userRef = doc(firestore, 'users', SHARED_USER_ID);

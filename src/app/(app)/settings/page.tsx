@@ -92,7 +92,7 @@ function FinancialAdvisor() {
   const { toast } = useToast();
 
   const transactionsQuery = useMemoFirebase(
-    () => (sharedUserId ? query(collection(firestore, 'users', sharedUserId, 'transactions')) : null),
+    () => (sharedUserId && firestore ? query(collection(firestore, 'users', sharedUserId, 'transactions')) : null),
     [firestore, sharedUserId]
   );
   const { data: transactions } = useCollection<Transaction>(transactionsQuery);
