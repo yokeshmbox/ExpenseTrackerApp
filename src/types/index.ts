@@ -37,6 +37,7 @@ export type CategoryName =
   | 'Entertainment'
   | 'Health'
   | 'Shopping'
+  | 'Grocery'
   | 'Utilities'
   | 'Loan'
   | 'Personal'

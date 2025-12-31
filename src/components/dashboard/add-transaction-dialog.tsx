@@ -147,7 +147,10 @@ export function AddTransactionDialog({ transaction, open, onOpenChange }: AddTra
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent 
+        className="sm:max-w-[425px]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Transaction': 'Add Transaction'}</DialogTitle>
           <DialogDescription>
@@ -203,6 +206,7 @@ export function AddTransactionDialog({ transaction, open, onOpenChange }: AddTra
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
                         <Input 
+                        id={field.name}
                         placeholder="100 or =50*2" 
                         value={amountFormula.displayValue}
                         onChange={(e) => amountFormula.handleChange(e.target.value)}

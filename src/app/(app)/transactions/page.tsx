@@ -209,8 +209,17 @@ export default function TransactionsPage() {
   
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [selectedCategory, setSelectedCategory] = useState('all');
+  
+  // Calculate months once
+  const now = new Date();
+  const currentMonth = format(now, 'yyyy-MM');
+  const lastMonthDate = new Date(now);
+  lastMonthDate.setDate(1); // Set to 1st of the month first to avoid overflow
+  lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+  const lastMonth = format(lastMonthDate, 'yyyy-MM');
+  
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const transactionsQuery = useMemoFirebase(
     () =>
@@ -225,6 +234,8 @@ export default function TransactionsPage() {
   const { data: transactions, isLoading } = useCollection<Transaction>(
     transactionsQuery
   );
+
+  // console.log(currentMonth, lastMonth);
 
   const { availableMonths, availableCategories } = useMemo(() => {
     if (!transactions) return { availableMonths: [], availableCategories: [] };
@@ -247,29 +258,6 @@ export default function TransactionsPage() {
 
     return { availableMonths: monthOptions, availableCategories: categoryOptions };
   }, [transactions]);
-  
-  useEffect(() => {
-    // Set default month only on initial load when months become available
-    if (availableMonths.length > 0 && selectedMonth === 'all' && !sessionStorage.getItem('transactions-month-selected')) {
-      const currentMonthValue = format(new Date(), 'yyyy-MM');
-      if (availableMonths.some(m => m.value === currentMonthValue)) {
-        setSelectedMonth(currentMonthValue);
-      } else if (availableMonths[0]) {
-        // If current month not available, default to the most recent one.
-        setSelectedMonth(availableMonths[0].value);
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableMonths]);
-
-  const handleMonthChange = (value: string) => {
-    if (value !== 'all') {
-      sessionStorage.setItem('transactions-month-selected', 'true');
-    } else {
-      sessionStorage.removeItem('transactions-month-selected');
-    }
-    setSelectedMonth(value);
-  }
 
 
   const filteredTransactions = useMemo(() => {
@@ -450,14 +438,13 @@ export default function TransactionsPage() {
     setDeletingTransaction(null);
   }
 
-  const isFiltered = filterType !== 'all' || selectedMonth !== 'all' || selectedCategory !== 'all' || searchQuery !== '';
+  const isFiltered = filterType !== 'all' || selectedMonth !== currentMonth || selectedCategory !== 'all' || searchQuery !== '';
 
   const clearFilters = () => {
     setFilterType('all');
-    setSelectedMonth('all');
+    setSelectedMonth(currentMonth);
     setSelectedCategory('all');
     setSearchQuery('');
-    sessionStorage.removeItem('transactions-month-selected');
   }
 
   return (
@@ -528,7 +515,7 @@ export default function TransactionsPage() {
                         </Button>
                     )}
                 </div>
-                {(selectedCategory !== 'all' || filterType !== 'all' || selectedMonth !== format(new Date(), 'yyyy-MM') || searchQuery) && (
+                {(selectedCategory !== 'all' || filterType !== 'all' || selectedMonth !== currentMonth || searchQuery) && (
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -544,22 +531,22 @@ export default function TransactionsPage() {
               {/* Compact Filter Controls */}
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <Button 
-                  variant={selectedMonth === format(new Date(), 'yyyy-MM') ? 'default' : 'outline'} 
+                  variant={selectedMonth === currentMonth ? 'default' : 'outline'} 
                   size="sm"
-                  onClick={() => handleMonthChange(format(new Date(), 'yyyy-MM'))}
+                  onClick={() => setSelectedMonth(currentMonth)}
                   className="h-8 px-3 text-xs"
                 >
                   This Month
                 </Button>
                 <Button 
-                  variant={selectedMonth === format(new Date(new Date().setMonth(new Date().getMonth() - 1)), 'yyyy-MM') ? 'default' : 'outline'} 
+                  variant={selectedMonth === lastMonth ? 'default' : 'outline'} 
                   size="sm"
-                  onClick={() => handleMonthChange(format(new Date(new Date().setMonth(new Date().getMonth() - 1)), 'yyyy-MM'))}
+                  onClick={() => setSelectedMonth(lastMonth)}
                   className="h-8 px-3 text-xs"
                 >
                   Last Month
                 </Button>
-                <Select value={selectedMonth} onValueChange={handleMonthChange}>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                     <SelectTrigger className="w-[130px] sm:w-[150px] h-8 text-xs bg-background">
                       <SelectValue placeholder="Period" />
                     </SelectTrigger>
