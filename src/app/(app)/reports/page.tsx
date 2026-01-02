@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { format } from 'date-fns';
-import { BarChart, IndianRupee, TrendingDown, TrendingUp, PiggyBank } from 'lucide-react';
+import { format, subMonths, parseISO } from 'date-fns';
+import { BarChart, IndianRupee, TrendingDown, TrendingUp, PiggyBank, FileText, ShoppingCart, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -15,7 +15,7 @@ import {
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { useSharedUser } from '@/firebase/auth/use-shared-user';
 import { collection, query, orderBy } from 'firebase/firestore';
-import type { Transaction } from '@/types';
+import type { Transaction, RecurringPayment } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -30,6 +30,10 @@ import {
   LabelList,
   Cell,
   Text,
+  Line,
+  LineChart,
+  Area,
+  AreaChart,
 } from 'recharts';
 
 const CHART_COLORS = [
@@ -93,7 +97,13 @@ export default function ReportsPage() {
     [firestore, sharedUserId]
   );
 
+  const billsQuery = useMemoFirebase(
+    () => (sharedUserId && firestore ? query(collection(firestore, 'users', sharedUserId, 'recurringPayments')) : null),
+    [firestore, sharedUserId]
+  );
+
   const { data: transactions, isLoading } = useCollection<Transaction>(transactionsQuery);
+  const { data: bills } = useCollection<RecurringPayment>(billsQuery);
 
   const availableMonths = useMemo(() => {
     if (!transactions) return [];
@@ -135,16 +145,23 @@ export default function ReportsPage() {
 
 
   const filteredData = useMemo(() => {
-    if (!transactions) return { income: 0, expenses: 0, totalInvestments: 0, categorySpending: [] };
+    if (!transactions) return { income: 0, expenses: 0, totalInvestments: 0, categorySpending: [], monthlyMandates: 0, dailyExpenses: 0 };
     
     const dataToFilter = transactions.filter(t => {
         if (selectedMonth === 'all') return true;
         return format(new Date(t.date), 'yyyy-MM') === selectedMonth;
     });
 
+    // Get bill transaction IDs for filtering
+    const billTransactionIds = new Set(
+      bills?.filter(bill => bill.transactionId).map(bill => bill.transactionId) || []
+    );
+
     let income = 0;
     let expenses = 0;
     let totalInvestments = 0;
+    let monthlyMandates = 0;
+    let dailyExpenses = 0;
     const categoryMap: { [key: string]: number } = {};
 
     dataToFilter.forEach((t) => {
@@ -160,6 +177,13 @@ export default function ReportsPage() {
           } else {
             expenses += t.amount;
           }
+
+          // Categorize as Monthly Mandates or Daily Expenses
+          if (billTransactionIds.has(t.id)) {
+            monthlyMandates += t.amount;
+          } else {
+            dailyExpenses += t.amount;
+          }
         }
     });
 
@@ -172,10 +196,92 @@ export default function ReportsPage() {
       expenses,
       totalInvestments,
       categorySpending,
+      monthlyMandates,
+      dailyExpenses,
+    };
+  }, [transactions, selectedMonth, bills]);
+
+  const { income, expenses, totalInvestments, categorySpending, monthlyMandates, dailyExpenses } = filteredData;
+
+  // Calculate spending trends (last 6 months)
+  const spendingTrends = useMemo(() => {
+    if (!transactions || selectedMonth === 'all') return { monthlyTrends: [], comparison: null, categoryChanges: [] };
+
+    // Get last 6 months including current selected month
+    const currentDate = parseISO(selectedMonth + '-01');
+    const last6Months = Array.from({ length: 6 }, (_, i) => {
+      const monthDate = subMonths(currentDate, 5 - i);
+      return format(monthDate, 'yyyy-MM');
+    });
+
+    // Calculate totals for each month
+    const monthlyData = last6Months.map(monthStr => {
+      const monthTransactions = transactions.filter(t => 
+        format(new Date(t.date), 'yyyy-MM') === monthStr
+      );
+
+      let income = 0;
+      let expenses = 0;
+      const categoryMap: { [key: string]: number } = {};
+
+      monthTransactions.forEach(t => {
+        if (t.type === 'income') {
+          income += t.amount;
+        } else {
+          expenses += t.amount;
+          categoryMap[t.category] = (categoryMap[t.category] || 0) + t.amount;
+        }
+      });
+
+      return {
+        month: monthStr,
+        monthLabel: format(parseISO(monthStr + '-01'), 'MMM yyyy'),
+        income,
+        expenses,
+        categories: categoryMap,
+      };
+    });
+
+    // Compare current month with previous month
+    const currentMonthData = monthlyData[monthlyData.length - 1];
+    const previousMonthData = monthlyData[monthlyData.length - 2];
+
+    const comparison = previousMonthData ? {
+      currentExpenses: currentMonthData.expenses,
+      previousExpenses: previousMonthData.expenses,
+      change: currentMonthData.expenses - previousMonthData.expenses,
+      percentChange: previousMonthData.expenses > 0 
+        ? ((currentMonthData.expenses - previousMonthData.expenses) / previousMonthData.expenses) * 100 
+        : 0,
+    } : null;
+
+    // Category-level changes
+    const categoryChanges = comparison ? Object.keys({
+      ...currentMonthData.categories,
+      ...previousMonthData.categories,
+    }).map(category => {
+      const current = currentMonthData.categories[category] || 0;
+      const previous = previousMonthData.categories[category] || 0;
+      const change = current - previous;
+      const percentChange = previous > 0 ? (change / previous) * 100 : 0;
+
+      return {
+        category,
+        current,
+        previous,
+        change,
+        percentChange,
+      };
+    }).filter(c => c.current > 0 || c.previous > 0)
+      .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+      .slice(0, 5) : [];
+
+    return {
+      monthlyTrends: monthlyData,
+      comparison,
+      categoryChanges,
     };
   }, [transactions, selectedMonth]);
-
-  const { income, expenses, totalInvestments, categorySpending } = filteredData;
   const chartData = categorySpending.slice(0, 10); // Top 10 categories
 
   return (
@@ -234,6 +340,250 @@ export default function ReportsPage() {
           isLoading={isLoading}
         />
       </div>
+
+      {/* Expense Breakdown Section */}
+      <Card className="border-none shadow-md bg-gradient-to-br from-background via-background to-muted/10">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <IndianRupee className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            Expense Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Monthly Mandates */}
+            <div className="group relative overflow-hidden rounded-xl border border-violet-200/50 dark:border-violet-800/50 bg-gradient-to-br from-violet-50/50 via-violet-50/30 to-background dark:from-violet-950/20 dark:via-violet-950/10 dark:to-background p-4 transition-all hover:shadow-lg hover:border-violet-300/60 dark:hover:border-violet-700/60">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full blur-3xl -z-10" />
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30">
+                      <FileText className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                    </div>
+                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Monthly Mandates</p>
+                  </div>
+                  <div className="mt-3">
+                    {isLoading ? (
+                      <div className="h-8 w-32 bg-muted animate-pulse rounded-md" />
+                    ) : (
+                      <p className="text-2xl font-bold text-violet-700 dark:text-violet-400">
+                        {monthlyMandates.toLocaleString('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 })}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Recurring bill payments and Investments
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Daily Expenses */}
+            <div className="group relative overflow-hidden rounded-xl border border-amber-200/50 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/50 via-amber-50/30 to-background dark:from-amber-950/20 dark:via-amber-950/10 dark:to-background p-4 transition-all hover:shadow-lg hover:border-amber-300/60 dark:hover:border-amber-700/60">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl -z-10" />
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                      <ShoppingCart className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Daily Expenses</p>
+                  </div>
+                  <div className="mt-3">
+                    {isLoading ? (
+                      <div className="h-8 w-32 bg-muted animate-pulse rounded-md" />
+                    ) : (
+                      <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                        {dailyExpenses.toLocaleString('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 })}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Daily spendings
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Spending Trends Section */}
+      {selectedMonth !== 'all' && spendingTrends.comparison && (
+        <Card className="border-none shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              Spending Trends & Comparison
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Month Comparison Cards */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              {/* Current Month */}
+              <div className="rounded-lg border bg-gradient-to-br from-blue-50/50 to-background dark:from-blue-950/20 dark:to-background p-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  This Month
+                </p>
+                <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                  {spendingTrends.comparison.currentExpenses.toLocaleString('en-IN', {
+                    style: 'currency',
+                    currency: 'INR',
+                    minimumFractionDigits: 0,
+                  })}
+                </p>
+              </div>
+
+              {/* Previous Month */}
+              <div className="rounded-lg border bg-gradient-to-br from-slate-50/50 to-background dark:from-slate-950/20 dark:to-background p-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Last Month
+                </p>
+                <p className="text-2xl font-bold text-slate-700 dark:text-slate-400">
+                  {spendingTrends.comparison.previousExpenses.toLocaleString('en-IN', {
+                    style: 'currency',
+                    currency: 'INR',
+                    minimumFractionDigits: 0,
+                  })}
+                </p>
+              </div>
+
+              {/* Change */}
+              <div className={`rounded-lg border p-4 ${
+                spendingTrends.comparison.change > 0
+                  ? 'bg-gradient-to-br from-rose-50/50 to-background dark:from-rose-950/20 dark:to-background border-rose-200/50 dark:border-rose-800/50'
+                  : spendingTrends.comparison.change < 0
+                  ? 'bg-gradient-to-br from-emerald-50/50 to-background dark:from-emerald-950/20 dark:to-background border-emerald-200/50 dark:border-emerald-800/50'
+                  : 'bg-gradient-to-br from-slate-50/50 to-background dark:from-slate-950/20 dark:to-background'
+              }`}>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Change
+                </p>
+                <div className="flex items-center gap-2">
+                  {spendingTrends.comparison.change > 0 ? (
+                    <ArrowUpRight className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                  ) : spendingTrends.comparison.change < 0 ? (
+                    <ArrowDownRight className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Minus className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                  )}
+                  <div>
+                    <p className={`text-xl font-bold ${
+                      spendingTrends.comparison.change > 0
+                        ? 'text-rose-700 dark:text-rose-400'
+                        : spendingTrends.comparison.change < 0
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : 'text-slate-700 dark:text-slate-400'
+                    }`}>
+                      {Math.abs(spendingTrends.comparison.percentChange).toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {spendingTrends.comparison.change > 0 ? 'increase' : spendingTrends.comparison.change < 0 ? 'decrease' : 'no change'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 6-Month Trend Chart */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3">Last 6 Months Trend</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <AreaChart data={spendingTrends.monthlyTrends}>
+                  <defs>
+                    <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis 
+                    dataKey="monthLabel" 
+                    tickLine={false}
+                    axisLine={false}
+                    style={{ fontSize: '0.75rem' }}
+                  />
+                  <YAxis 
+                    tickFormatter={(value) => `₹${Number(value) / 1000}k`}
+                    tickLine={false}
+                    axisLine={false}
+                    style={{ fontSize: '0.75rem' }}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="rounded-lg border bg-background p-3 shadow-md">
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {payload[0].payload.monthLabel}
+                            </p>
+                            <p className="text-sm font-bold">
+                              Expenses: {Number(payload[0].value).toLocaleString('en-IN', {
+                                style: 'currency',
+                                currency: 'INR',
+                                minimumFractionDigits: 0,
+                              })}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="expenses"
+                    stroke="hsl(var(--chart-1))"
+                    strokeWidth={2}
+                    fill="url(#colorExpenses)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Category Changes */}
+            {spendingTrends.categoryChanges.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold mb-3">Top Category Changes</h3>
+                <div className="space-y-2">
+                  {spendingTrends.categoryChanges.map((cat) => (
+                    <div
+                      key={cat.category}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{cat.category}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {cat.previous.toLocaleString('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 })}
+                          {' → '}
+                          {cat.current.toLocaleString('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {cat.change > 0 ? (
+                          <ArrowUpRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        )}
+                        <div className="text-right">
+                          <p className={`text-sm font-bold ${
+                            cat.change > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
+                          }`}>
+                            {cat.change > 0 ? '+' : ''}{Math.abs(cat.percentChange).toFixed(1)}%
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {cat.change > 0 ? '+' : ''}{cat.change.toLocaleString('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

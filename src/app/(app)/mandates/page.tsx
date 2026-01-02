@@ -13,6 +13,8 @@ import {
   Wallet,
   Undo2,
   GripVertical,
+  DollarSign,
+  TrendingDown,
 } from 'lucide-react';
 import {
   useCollection,
@@ -429,6 +431,17 @@ export default function BillsPage() {
     }
   }, [bills, isBillPaidThisMonth]);
 
+  // Calculate totals
+  const totals = useMemo(() => {
+    const paidBills = orderedBills.filter(isBillPaidThisMonth);
+    const unpaidBills = orderedBills.filter(b => !isBillPaidThisMonth(b));
+    
+    const totalPaid = paidBills.reduce((sum, bill) => sum + bill.amount, 0);
+    const projectedRemaining = unpaidBills.reduce((sum, bill) => sum + bill.amount, 0);
+    
+    return { totalPaid, projectedRemaining };
+  }, [orderedBills, isBillPaidThisMonth]);
+
 
   const confirmPayment = async (billToPay: RecurringPayment, amount: number) => {
     if (!sharedUserId || !firestore) return;
@@ -589,6 +602,81 @@ export default function BillsPage() {
               Add Bill
               </Button>
             </div>
+      </div>
+
+      {/* Total Paid & Projected Remaining */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {/* Total Paid This Month */}
+        <Card className="border-none shadow-md bg-gradient-to-br from-emerald-50/80 via-emerald-50/40 to-background dark:from-emerald-950/30 dark:via-emerald-950/15 dark:to-background">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-500/15 dark:bg-emerald-500/20">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                      Paid This Month
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {orderedBills.filter(isBillPaidThisMonth).length} bills settled
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  {isLoading ? (
+                    <div className="h-9 w-36 bg-muted animate-pulse rounded-md" />
+                  ) : (
+                    <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
+                      {totals.totalPaid.toLocaleString('en-IN', {
+                        style: 'currency',
+                        currency: 'INR',
+                        minimumFractionDigits: 0,
+                      })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Projected Remaining */}
+        <Card className="border-none shadow-md bg-gradient-to-br from-amber-50/80 via-amber-50/40 to-background dark:from-amber-950/30 dark:via-amber-950/15 dark:to-background">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-500/15 dark:bg-amber-500/20">
+                    <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                      Projected Remaining
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {orderedBills.filter(b => !isBillPaidThisMonth(b)).length} bills pending
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  {isLoading ? (
+                    <div className="h-9 w-36 bg-muted animate-pulse rounded-md" />
+                  ) : (
+                    <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">
+                      {totals.projectedRemaining.toLocaleString('en-IN', {
+                        style: 'currency',
+                        currency: 'INR',
+                        minimumFractionDigits: 0,
+                      })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
