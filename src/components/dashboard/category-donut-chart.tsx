@@ -39,51 +39,79 @@ export function CategoryDonutChart({ data, isLoading }: CategoryDonutChartProps)
     setIsClient(true);
   }, []);
 
+  // Limit to top 14 categories to avoid overlap
+  const topCategories = React.useMemo(() => {
+    if (data.length <= 14) return data;
+    
+    const sorted = [...data].sort((a, b) => b.value - a.value);
+    const top13 = sorted.slice(0, 13);
+    const others = sorted.slice(13);
+    
+    if (others.length > 0) {
+      const othersTotal = others.reduce((sum, cat) => sum + cat.value, 0);
+      return [...top13, { name: 'Others', value: othersTotal }];
+    }
+    
+    return top13;
+  }, [data]);
+
   const chartOption = {
     tooltip: {
       trigger: 'item',
       formatter: '{b}: ₹{c} ({d}%)',
     },
     legend: {
+      type: 'scroll',
       orient: 'horizontal',
-      top: 'top',
+      top: 0,
       left: 'center',
       textStyle: {
         color: 'hsl(var(--foreground))',
+        fontSize: 11,
       },
-      // Ensure legend items can wrap if needed
+      pageIconSize: 10,
+      pageTextStyle: {
+        color: 'hsl(var(--foreground))',
+      },
       formatter: function (name: string) {
-        return name.length > 15 ? name.substring(0, 15) + '...' : name;
-      }
+        return name.length > 12 ? name.substring(0, 12) + '...' : name;
+      },
+      itemWidth: 12,
+      itemHeight: 12,
+      itemGap: 8,
     },
     color: CHART_COLORS,
     series: [
       {
         name: 'Spending',
         type: 'pie',
-        radius: ['50%', '80%'],
-        center: ['50%', '60%'], // Adjust center to make space for the top legend
-        avoidLabelOverlap: false,
-        padAngle: 5,
+        radius: ['45%', '75%'],
+        center: ['50%', '55%'],
+        avoidLabelOverlap: true,
+        padAngle: 3,
         itemStyle: {
-          borderRadius: 10,
+          borderRadius: 8,
         },
         label: {
           show: false,
-          position: 'center',
         },
         emphasis: {
           label: {
             show: true,
-            fontSize: 20,
+            fontSize: 16,
             fontWeight: 'bold',
-            formatter: '{b}',
+            formatter: '{b}\n{d}%',
+          },
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.3)',
           },
         },
         labelLine: {
           show: false,
         },
-        data: data,
+        data: topCategories,
       },
     ],
   };

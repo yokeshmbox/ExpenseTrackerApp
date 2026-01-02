@@ -162,9 +162,18 @@ export function generatePdfStatement({
   doc.text(isAllTime ? 'MONTHLY BREAKDOWN' : 'TRANSACTION HISTORY', margin, tableStartY);
 
   // Sorting to ensure chronological order
-  const sortedTransactions = [...transactions].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  // For same-day transactions, maintain original order (by ID)
+  const sortedTransactions = [...transactions].sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    
+    if (dateA !== dateB) {
+      return dateA - dateB; // Sort by date first
+    }
+    
+    // If dates are the same, sort by ID to maintain consistent order
+    return a.id.localeCompare(b.id);
+  });
 
   if (isAllTime) {
     // Group transactions by month

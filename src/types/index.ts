@@ -25,6 +25,7 @@ export type RecurringPayment = {
   category: CategoryName;
   lastPaidDate: string | null;
   transactionId?: string | null;
+  skippedMonths?: string[]; // Array of month strings like ["2026-01", "2025-12"]
 }
 
 export type CategoryName =

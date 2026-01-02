@@ -15,9 +15,7 @@ import {
   ArrowDownCircle,
   ArrowLeftRight,
   ArrowUpCircle,
-  Download,
   Edit,
-  MoreVertical,
   PlusCircle,
   Trash2,
   X,
@@ -41,7 +39,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import * as XLSX from 'xlsx';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
   AlertDialog,
@@ -54,7 +51,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { generatePdfStatement } from '@/lib/export-pdf';
 import { useUser } from '@/firebase';
 import { Card, CardContent } from '@/components/ui/card';
@@ -274,105 +270,6 @@ export default function TransactionsPage() {
       .filter((t) => (selectedCategory === 'all' ? true : t.category === selectedCategory));
   }, [transactions, filterType, searchQuery, selectedMonth, selectedCategory]);
 
-  const handleExportExcel = () => {
-    const monthLabel = availableMonths.find(m => m.value === selectedMonth)?.label || 'All-Time';
-    const periodText = selectedMonth === 'all' ? 'All Time' : monthLabel;
-    
-    const { totalIncome, totalExpenses, netSavings } = filteredTransactions.reduce(
-      (acc, t) => {
-        if (t.type === 'income') {
-          acc.totalIncome += t.amount;
-        } else {
-          acc.totalExpenses += t.amount;
-        }
-        acc.netSavings = acc.totalIncome - acc.totalExpenses;
-        return acc;
-      },
-      { totalIncome: 0, totalExpenses: 0, netSavings: 0 }
-    );
-  
-    const currencyFormat = '"Rs" #,##0.00';
-    const summaryData = [
-      [{ v: 'Financial Summary', s: { font: { bold: true, sz: 14 } } }],
-      [
-        { v: 'Report Period', s: { font: { bold: true } } },
-        { v: periodText },
-      ],
-      [],
-      [
-        { v: 'Total Income', s: { font: { bold: true } } },
-        { v: totalIncome, t: 'n', z: currencyFormat },
-      ],
-      [
-        { v: 'Total Expenses', s: { font: { bold: true } } },
-        { v: totalExpenses, t: 'n', z: currencyFormat },
-      ],
-      [
-        { v: 'Net Savings', s: { font: { bold: true } } },
-        { v: netSavings, t: 'n', z: currencyFormat },
-      ],
-      [], 
-      [],
-      [{ v: 'All Transactions', s: { font: { bold: true, sz: 14 } } }],
-      [], 
-      [
-        { v: 'Date', s: { font: { bold: true } } },
-        { v: 'Description', s: { font: { bold: true } } },
-        { v: 'Category', s: { font: { bold: true } } },
-        { v: 'Type', s: { font: { bold: true } } },
-        { v: 'Amount', s: { font: { bold: true } } },
-      ],
-    ];
-  
-    const transactionRows = filteredTransactions.map((t) => [
-      new Date(t.date),
-      t.description,
-      t.category,
-      t.type,
-      t.amount,
-    ]);
-  
-    const finalData = [...summaryData, ...transactionRows];
-  
-    const worksheet = XLSX.utils.aoa_to_sheet(finalData);
-  
-    worksheet['!cols'] = [
-      { wch: 20 }, // Period
-      { wch: 35 }, // Description
-      { wch: 15 }, // Category
-      { wch: 10 }, // Type
-      { wch: 15 }, // Amount
-    ];
-  
-    transactionRows.forEach((_, index) => {
-      // Adjust for summary rows
-      const rowIndex = 11 + index + 1; 
-      
-      // Amount column
-      const amountCellRef = `E${rowIndex}`;
-      if (worksheet[amountCellRef]) {
-        worksheet[amountCellRef].t = 'n';
-        worksheet[amountCellRef].z = currencyFormat;
-      }
-      
-      // Date column
-      const dateCellRef = `A${rowIndex}`;
-        if (worksheet[dateCellRef]) {
-            worksheet[dateCellRef].t = 'd';
-            worksheet[dateCellRef].z = 'dd-mmm-yyyy';
-        }
-    });
-
-    // Make Period row date column wider
-    if (worksheet['A2']) {
-      worksheet['!cols'][0] = { wch: 20 };
-    }
-  
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Financial Report');
-    XLSX.writeFile(workbook, `ZenithSpend_Report_${monthLabel.replace(' ','-')}.xlsx`);
-  };
-
   const handleExportPdf = () => {
     if (!transactions) {
       toast({
@@ -471,26 +368,17 @@ export default function TransactionsPage() {
             size="default"
           >
             <PlusCircle className="mr-2 h-4 w-4" />
-            <span className="text-sm">Add</span>
+            <span className="text-sm">Add Transaction</span>
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-10 w-10">
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">More options</span>
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportExcel}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export to Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPdf}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Export as PDF
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button 
+            onClick={handleExportPdf}
+            variant="outline"
+            size="default"
+            className="flex-1 sm:flex-none"
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            <span className="text-sm">Export PDF</span>
+          </Button>
         </div>
       </div>
       
@@ -580,7 +468,6 @@ export default function TransactionsPage() {
                       <SelectItem value="all">All Types</SelectItem>
                       <SelectItem value="income">Income</SelectItem>
                       <SelectItem value="expense">Expense</SelectItem>
-                      <SelectItem value="investment">Investment</SelectItem>
                     </SelectContent>
                 </Select>
               </div>

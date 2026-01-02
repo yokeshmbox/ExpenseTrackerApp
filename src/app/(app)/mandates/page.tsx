@@ -403,6 +403,13 @@ export default function BillsPage() {
     );
   }, []);
 
+  const isBillSkippedThisMonth = useCallback((bill: RecurringPayment) => {
+    if (!bill.skippedMonths || bill.skippedMonths.length === 0) return false;
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return bill.skippedMonths.includes(currentMonth);
+  }, []);
+
   useEffect(() => {
     if (bills) {
         let sorted: RecurringPayment[];
@@ -434,13 +441,20 @@ export default function BillsPage() {
   // Calculate totals
   const totals = useMemo(() => {
     const paidBills = orderedBills.filter(isBillPaidThisMonth);
-    const unpaidBills = orderedBills.filter(b => !isBillPaidThisMonth(b));
+    const skippedBills = orderedBills.filter(isBillSkippedThisMonth);
+    const unpaidBills = orderedBills.filter(b => !isBillPaidThisMonth(b) && !isBillSkippedThisMonth(b));
     
     const totalPaid = paidBills.reduce((sum, bill) => sum + bill.amount, 0);
     const projectedRemaining = unpaidBills.reduce((sum, bill) => sum + bill.amount, 0);
     
-    return { totalPaid, projectedRemaining };
-  }, [orderedBills, isBillPaidThisMonth]);
+    return { 
+      totalPaid, 
+      projectedRemaining, 
+      paidCount: paidBills.length,
+      skippedCount: skippedBills.length,
+      unpaidCount: unpaidBills.length
+    };
+  }, [orderedBills, isBillPaidThisMonth, isBillSkippedThisMonth]);
 
 
   const confirmPayment = async (billToPay: RecurringPayment, amount: number) => {
@@ -526,6 +540,64 @@ export default function BillsPage() {
         });
     }
   }
+
+  const handleSkipMonth = async (bill: RecurringPayment) => {
+    if (!sharedUserId || !firestore) return;
+
+    const billRef = doc(firestore, 'users', sharedUserId, 'recurringPayments', bill.id);
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    try {
+      const skippedMonths = bill.skippedMonths || [];
+      if (!skippedMonths.includes(currentMonth)) {
+        updateDocumentNonBlocking(billRef, {
+          skippedMonths: [...skippedMonths, currentMonth]
+        });
+        
+        toast({
+          title: 'Bill Skipped',
+          description: `${bill.name} marked as skipped for this month.`,
+        });
+      }
+    } catch (e) {
+      console.error('Skip month failed:', e);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not skip bill for this month.',
+      });
+    }
+  };
+
+  const handleUnskipMonth = async (bill: RecurringPayment) => {
+    if (!sharedUserId || !firestore) return;
+
+    const billRef = doc(firestore, 'users', sharedUserId, 'recurringPayments', bill.id);
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    try {
+      const skippedMonths = bill.skippedMonths || [];
+      const updatedSkippedMonths = skippedMonths.filter(month => month !== currentMonth);
+      
+      updateDocumentNonBlocking(billRef, {
+        skippedMonths: updatedSkippedMonths
+      });
+      
+      toast({
+        title: 'Skip Removed',
+        description: `${bill.name} is now pending for this month.`,
+      });
+    } catch (e) {
+      console.error('Unskip month failed:', e);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not remove skip for this month.',
+      });
+    }
+  };
 
 
   const handleDelete = () => {
@@ -620,7 +692,7 @@ export default function BillsPage() {
                       Paid This Month
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {orderedBills.filter(isBillPaidThisMonth).length} bills settled
+                      {totals.paidCount} bill{totals.paidCount !== 1 ? 's' : ''} settled
                     </p>
                   </div>
                 </div>
@@ -656,7 +728,8 @@ export default function BillsPage() {
                       Projected Remaining
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {orderedBills.filter(b => !isBillPaidThisMonth(b)).length} bills pending
+                      {totals.unpaidCount} pending
+                      {totals.skippedCount > 0 && ` • ${totals.skippedCount} skipped`}
                     </p>
                   </div>
                 </div>
@@ -748,10 +821,14 @@ export default function BillsPage() {
                                 <div className={cn(
                                   "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap",
                                   isPaid 
-                                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" 
+                                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                                    : isBillSkippedThisMonth(bill)
+                                    ? "bg-muted text-muted-foreground border border-border"
                                     : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
                                 )}>
-                                  <span>{isPaid ? 'Paid' : 'Pending'}</span>
+                                  <span>
+                                    {isPaid ? 'Paid' : isBillSkippedThisMonth(bill) ? 'Skipped' : 'Pending'}
+                                  </span>
                                 </div>
                             </TableCell>
                             <TableCell className="hidden md:table-cell py-3">
@@ -778,16 +855,37 @@ export default function BillsPage() {
                                             <Undo2 className="mr-1 h-3.5 w-3.5" />
                                             <span className="hidden xs:inline">Reset</span>
                                         </Button>
-                                    ) : (
+                                    ) : isBillSkippedThisMonth(bill) ? (
                                         <Button
-                                            variant="default"
+                                            variant="outline"
                                             size="sm"
-                                            onClick={() => setPayingBill(bill)}
-                                            className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
-                                            >
-                                            <Wallet className="mr-1 h-3.5 w-3.5" />
-                                            <span className="hidden xs:inline">Pay Now</span>
+                                            onClick={() => handleUnskipMonth(bill)}
+                                            className="h-8 text-xs"
+                                        >
+                                            <Undo2 className="mr-1 h-3.5 w-3.5" />
+                                            <span className="hidden xs:inline">Undo Skip</span>
                                         </Button>
+                                    ) : (
+                                        <>
+                                            <Button
+                                                variant="default"
+                                                size="sm"
+                                                onClick={() => setPayingBill(bill)}
+                                                className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
+                                            >
+                                                <Wallet className="mr-1 h-3.5 w-3.5" />
+                                                <span className="hidden xs:inline">Pay Now</span>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleSkipMonth(bill)}
+                                                className="h-8 text-xs"
+                                            >
+                                                <span className="hidden xs:inline">Skip Month</span>
+                                                <span className="xs:hidden">Skip</span>
+                                            </Button>
+                                        </>
                                     )}
                                 
                                     <Button variant="ghost" size="icon" onClick={() => setEditingBill(bill)} className="h-8 w-8 hover:bg-muted">
